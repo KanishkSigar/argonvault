@@ -1,0 +1,47 @@
+# --- secrets ---
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- node / next ---
+node_modules/
+.next/
+out/
+.npm/
+.pnpm-store/
+.yarn/
+
+# --- editor / os ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- local artifacts ---
+uploads/
+decrypted/
+*.log
+.minio/
+
+# --- SQLite dev DB ---
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# --- terraform local state ---
+infra/terraform/.terraform/
+infra/terraform/.terraform.lock.hcl
+infra/terraform/terraform.tfstate*
+infra/terraform/terraform.tfvars
