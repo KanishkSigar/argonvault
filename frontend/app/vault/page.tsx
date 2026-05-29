@@ -19,20 +19,20 @@ import {
   FileText,
   FileVideo,
   Folder,
-  FolderOpen,
   FolderPlus,
   Home,
   Image as ImageIcon,
   Inbox,
   Loader2,
-  Lock,
-  LogOut,
   Pencil,
   RotateCcw,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
+import { AccountMenu } from "@/components/AccountMenu";
+import { Sidebar } from "@/components/Sidebar";
+import { useToast } from "@/components/Toast";
 import { ApiError, nodes as nodesApi } from "@/lib/api";
 import {
   createFolder,
@@ -48,9 +48,11 @@ import {
 } from "@/lib/vault";
 import { getVaultSession } from "@/lib/vaultSession";
 
-type Tab = "files" | "trash";
+type View = "files" | "trash";
 type Crumb = { id: string | null; name: string };
-type UploadJob = { id: string; name: string; status: "uploading" | "done" | "error"; error?: string };
+type UploadJob = { id: string; name: string; status: "uploading" | "done" | "error" };
+
+const SERVER_VIEW_KEY = "argonvault.serverView";
 
 function formatBytes(n: number | null): string {
   if (n === null) return "—";
@@ -62,11 +64,14 @@ function formatBytes(n: number | null): string {
 
 export default function VaultPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("files");
+  const toast = useToast();
+
+  const [view, setView] = useState<View>("files");
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [crumbs, setCrumbs] = useState<Crumb[]>([{ id: null, name: "Home" }]);
   const [items, setItems] = useState<DecryptedNode[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [trashCount, setTrashCount] = useState(0);
+  const [totalBytes, setTotalBytes] = useState(0);
   const [email, setEmail] = useState<string | null>(null);
   const [uploads, setUploads] = useState<UploadJob[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -77,6 +82,8 @@ export default function VaultPage() {
   const [newFolderName, setNewFolderName] = useState("");
   const [renameNodeId, setRenameNodeId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [serverView, setServerView] = useState(false);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // ---- bootstrap ----
@@ -84,21 +91,50 @@ export default function VaultPage() {
     const s = getVaultSession();
     if (!s) { router.replace("/login"); return; }
     setEmail(s.email);
+    const persisted = localStorage.getItem(SERVER_VIEW_KEY);
+    if (persisted === "1") setServerView(true);
   }, [router]);
 
   // ---- list refresh ----
   const refresh = useCallback(async () => {
     try {
-      const raw = tab === "trash" ? await nodesApi.listTrash() : await nodesApi.list(currentId);
+      const raw = view === "trash" ? await nodesApi.listTrash() : await nodesApi.list(currentId);
       const decrypted = await decryptNodes(raw.items);
       setItems(decrypted);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) { router.replace("/login"); return; }
-      setError("Could not load");
+      toast({ tone: "error", title: "Could not load" });
     }
-  }, [tab, currentId, router]);
+  }, [view, currentId, router, toast]);
+
+  // Side counters + total storage usage. Walks the tree from root to compute
+  // total ciphertext bytes — bounded by user's own vault, fine for portfolio
+  // scale. Refreshed whenever the visible list changes.
+  const refreshCounters = useCallback(async () => {
+    try {
+      const trash = await nodesApi.listTrash();
+      setTrashCount(trash.items.length);
+      let total = 0;
+      const queue: (string | null)[] = [null];
+      const visited = new Set<string | null>();
+      while (queue.length) {
+        const parent = queue.shift()!;
+        if (visited.has(parent)) continue;
+        visited.add(parent);
+        const page = await nodesApi.list(parent);
+        for (const n of page.items) {
+          if (n.kind === "file") total += n.size ?? 0;
+          else queue.push(n.id);
+        }
+      }
+      setTotalBytes(total);
+    } catch {
+      /* best-effort */
+    }
+  }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { refreshCounters(); }, [refreshCounters, items]);
 
   // ---- nav ----
   function openFolder(node: DecryptedNode) {
@@ -110,13 +146,17 @@ export default function VaultPage() {
     setCrumbs(next);
     setCurrentId(next[next.length - 1].id);
   }
-  function switchTab(t: Tab) {
-    setTab(t);
-    if (t === "files") {
-      // reset to root on Files tab so the breadcrumb makes sense
+  function switchView(v: View) {
+    setView(v);
+    if (v === "files") {
       setCrumbs([{ id: null, name: "Home" }]);
       setCurrentId(null);
     }
+  }
+  function toggleServerView(v: boolean) {
+    setServerView(v);
+    localStorage.setItem(SERVER_VIEW_KEY, v ? "1" : "0");
+    if (v) toast({ tone: "info", title: "Server view on", description: "showing what storage and the database see" });
   }
 
   // ---- uploads ----
@@ -126,9 +166,11 @@ export default function VaultPage() {
     try {
       await uploadFile(currentId, file);
       setUploads((u) => u.map((j) => (j.id === id ? { ...j, status: "done" as const } : j)));
+      toast({ tone: "success", title: "Uploaded", description: file.name });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "upload failed";
-      setUploads((u) => u.map((j) => (j.id === id ? { ...j, status: "error" as const, error: msg } : j)));
+      setUploads((u) => u.map((j) => (j.id === id ? { ...j, status: "error" as const } : j)));
+      toast({ tone: "error", title: "Upload failed", description: msg });
     }
   }
   async function handleFiles(files: FileList | File[]) {
@@ -136,19 +178,19 @@ export default function VaultPage() {
     if (!arr.length) return;
     await Promise.all(arr.map(runUpload));
     refresh();
-    setTimeout(() => setUploads((u) => u.filter((j) => j.status !== "done")), 1500);
+    setTimeout(() => setUploads((u) => u.filter((j) => j.status === "uploading")), 1500);
   }
   function onPickFile(e: ChangeEvent<HTMLInputElement>) {
     if (e.target.files) handleFiles(e.target.files);
     if (fileInput.current) fileInput.current.value = "";
   }
-  function onDragEnter(e: DragEvent) { e.preventDefault(); if (tab === "files") setDragOver(true); }
-  function onDragOver(e: DragEvent) { e.preventDefault(); if (tab === "files") setDragOver(true); }
+  function onDragEnter(e: DragEvent) { e.preventDefault(); if (view === "files") setDragOver(true); }
+  function onDragOver(e: DragEvent) { e.preventDefault(); if (view === "files") setDragOver(true); }
   function onDragLeave(e: DragEvent) { e.preventDefault(); if (e.currentTarget === e.target) setDragOver(false); }
   function onDrop(e: DragEvent) {
     e.preventDefault();
     setDragOver(false);
-    if (tab !== "files") return;
+    if (view !== "files") return;
     const files = e.dataTransfer?.files;
     if (files?.length) handleFiles(files);
   }
@@ -161,31 +203,34 @@ export default function VaultPage() {
       await createFolder(currentId, name);
       setShowNewFolder(false);
       setNewFolderName("");
+      toast({ tone: "success", title: "Folder created", description: name });
       refresh();
-    } catch (e) { setError(e instanceof Error ? e.message : "create folder failed"); }
+    } catch (e) {
+      toast({ tone: "error", title: "Could not create folder", description: e instanceof Error ? e.message : "" });
+    }
   }
   function startRename(n: DecryptedNode) { setRenameNodeId(n.id); setRenameValue(n.name); }
   async function submitRename() {
     if (!renameNodeId) return;
     const newName = renameValue.trim();
     if (!newName) return setRenameNodeId(null);
-    try { await renameNode(renameNodeId, newName); setRenameNodeId(null); refresh(); }
-    catch (e) { setError(e instanceof Error ? e.message : "rename failed"); }
+    try { await renameNode(renameNodeId, newName); setRenameNodeId(null); refresh(); toast({ tone: "success", title: "Renamed" }); }
+    catch (e) { toast({ tone: "error", title: "Rename failed", description: e instanceof Error ? e.message : "" }); }
   }
 
-  // ---- trash actions ----
+  // ---- trash ----
   async function onTrash(n: DecryptedNode) {
-    try { await nodesApi.trash(n.id); refresh(); }
-    catch { setError("could not move to trash"); }
+    try { await nodesApi.trash(n.id); refresh(); toast({ tone: "info", title: "Moved to trash", description: n.name }); }
+    catch { toast({ tone: "error", title: "Could not move to trash" }); }
   }
   async function onRestore(n: DecryptedNode) {
-    try { await nodesApi.restore(n.id); refresh(); }
-    catch { setError("restore failed"); }
+    try { await nodesApi.restore(n.id); refresh(); toast({ tone: "success", title: "Restored", description: n.name }); }
+    catch { toast({ tone: "error", title: "Restore failed" }); }
   }
   async function onPermanentlyDelete(n: DecryptedNode) {
     if (!confirm(`Permanently delete "${n.name}"? This cannot be undone.`)) return;
-    try { await nodesApi.deletePermanently(n.id); refresh(); }
-    catch { setError("delete failed"); }
+    try { await nodesApi.deletePermanently(n.id); refresh(); toast({ tone: "info", title: "Deleted forever", description: n.name }); }
+    catch { toast({ tone: "error", title: "Delete failed" }); }
   }
 
   // ---- preview / download ----
@@ -195,7 +240,7 @@ export default function VaultPage() {
       const { url, mime } = await previewBlobUrl(n.id, n.name);
       setPreviewUrl(url); setPreviewMime(mime);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "preview failed");
+      toast({ tone: "error", title: "Preview failed", description: e instanceof Error ? e.message : "" });
       setPreviewNode(null);
     }
   }
@@ -205,145 +250,127 @@ export default function VaultPage() {
   }
   async function onDownload(n: DecryptedNode) {
     try { await downloadAndSave(n.id, n.name); }
-    catch (e) { setError(e instanceof Error ? e.message : "download failed"); }
+    catch (e) { toast({ tone: "error", title: "Download failed", description: e instanceof Error ? e.message : "" }); }
   }
   async function onLogout() { await logout(); router.replace("/login"); }
 
-  const activeUploads = useMemo(() => uploads.filter((u) => u.status !== "done"), [uploads]);
-  const isFilesTab = tab === "files";
+  const activeUploads = useMemo(() => uploads.filter((u) => u.status === "uploading"), [uploads]);
+  const isFiles = view === "files";
+  const fileCount = items && isFiles ? items.filter((n) => n.kind === "file").length : 0;
 
   return (
-    <main className="container">
-      <header className="app-header">
-        <div className="app-brand">
-          <Lock size={16} className="accent" />
-          <span>ArgonVault</span>
-        </div>
-        <div className="row">
-          {email && <span className="muted mono" style={{ fontSize: 12 }}>{email}</span>}
-          <button className="ghost" onClick={onLogout}>
-            <LogOut size={14} /> Logout
-          </button>
-        </div>
-      </header>
+    <div className="app-shell">
+      <Sidebar
+        view={view}
+        onView={switchView}
+        fileCount={fileCount}
+        trashCount={trashCount}
+        totalBytes={totalBytes}
+        serverView={serverView}
+        onServerView={toggleServerView}
+        onShowHowItWorks={() => setShowHowItWorks(true)}
+      />
 
-      <div className="tabs">
-        <button className={`tab ${isFilesTab ? "active" : ""}`} onClick={() => switchTab("files")}>
-          <FolderOpen size={14} /> Files
-        </button>
-        <button className={`tab ${!isFilesTab ? "active" : ""}`} onClick={() => switchTab("trash")}>
-          <Trash2 size={14} /> Trash
-        </button>
-      </div>
-
-      <div className="toolbar">
-        {isFilesTab ? (
-          <nav className="breadcrumb">
-            {crumbs.map((c, i) => (
-              <span key={`${c.id ?? "root"}-${i}`} className="row" style={{ gap: 2 }}>
-                {i > 0 && <span className="sep"><ChevronRight size={14} /></span>}
-                <span
-                  className={`crumb ${i === crumbs.length - 1 ? "current" : ""}`}
-                  onClick={() => i !== crumbs.length - 1 && gotoCrumb(i)}
-                >
-                  {i === 0 ? <Home size={13} /> : null}
-                  {c.name}
+      <main className="app-main">
+        <header className="app-topbar">
+          {isFiles ? (
+            <nav className="breadcrumb">
+              {crumbs.map((c, i) => (
+                <span key={`${c.id ?? "root"}-${i}`} className="row" style={{ gap: 2 }}>
+                  {i > 0 && <span className="sep"><ChevronRight size={14} /></span>}
+                  <span
+                    className={`crumb ${i === crumbs.length - 1 ? "current" : ""}`}
+                    onClick={() => i !== crumbs.length - 1 && gotoCrumb(i)}
+                  >
+                    {i === 0 ? <Home size={13} /> : null}
+                    {c.name}
+                  </span>
                 </span>
-              </span>
-            ))}
-          </nav>
-        ) : (
-          <span className="muted" style={{ fontSize: 13 }}>
-            Items in trash · restore or delete permanently
-          </span>
-        )}
-
-        {isFilesTab && (
-          <div className="row">
-            <button className="ghost" onClick={() => setShowNewFolder(true)}>
-              <FolderPlus size={14} /> New folder
-            </button>
-            <button onClick={() => fileInput.current?.click()}>
-              <Upload size={14} /> Upload
-            </button>
-            <input ref={fileInput} type="file" multiple onChange={onPickFile} style={{ display: "none" }} />
-          </div>
-        )}
-      </div>
-
-      {activeUploads.length > 0 && (
-        <div className="status-strip">
-          {activeUploads.map((u) => (
-            <div key={u.id} className="upload-row">
-              <span className="row" style={{ gap: 8, overflow: "hidden", flex: 1 }}>
-                {u.status === "uploading"
-                  ? <Loader2 size={14} className="spin" style={{ color: "var(--accent)" }} />
-                  : <X size={14} style={{ color: "var(--danger)" }} />}
-                <span className="name mono">{u.name}</span>
-              </span>
-              <span className={u.status === "error" ? "error" : "muted"} style={{ fontSize: 12 }}>
-                {u.status === "uploading" ? "encrypting + uploading…" : u.error}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {error && (
-        <div className="status-strip error-strip">
-          <div className="upload-row">
-            <span className="error">{error}</span>
-            <button className="subtle" onClick={() => setError(null)}>dismiss</button>
-          </div>
-        </div>
-      )}
-
-      <div
-        className={`drop-zone ${dragOver ? "dragover" : ""}`}
-        onDragEnter={onDragEnter}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-      >
-        {!items ? (
-          <div className="empty">
-            <Loader2 size={20} className="spin" />
-            <span>Loading…</span>
-          </div>
-        ) : items.length === 0 ? (
-          <div className="empty">
-            <Inbox size={36} className="icon" />
-            <span>
-              {isFilesTab
-                ? "Empty folder. Drag files here or use the buttons above."
-                : "Trash is empty."}
+              ))}
+            </nav>
+          ) : (
+            <span className="muted" style={{ fontSize: 13 }}>
+              Items in trash — restore or delete permanently
             </span>
-          </div>
-        ) : (
-          <div className="node-grid">
-            {items.map((n) => (
-              <NodeCard
-                key={n.id}
-                node={n}
-                inTrash={!isFilesTab}
-                onOpenFolder={() => openFolder(n)}
-                onPreview={() => onOpenPreview(n)}
-                onDownload={() => onDownload(n)}
-                onTrash={() => onTrash(n)}
-                onRestore={() => onRestore(n)}
-                onPermanentlyDelete={() => onPermanentlyDelete(n)}
-                onRename={() => startRename(n)}
-              />
+          )}
+
+          {email && <AccountMenu email={email} onLogout={onLogout} />}
+        </header>
+
+        <section className="app-toolbar">
+          {isFiles && (
+            <div className="row" style={{ gap: 8 }}>
+              <button className="ghost" onClick={() => setShowNewFolder(true)}>
+                <FolderPlus size={14} /> New folder
+              </button>
+              <button onClick={() => fileInput.current?.click()}>
+                <Upload size={14} /> Upload
+              </button>
+              <input ref={fileInput} type="file" multiple onChange={onPickFile} style={{ display: "none" }} />
+            </div>
+          )}
+          {serverView && (
+            <div className="server-banner">
+              <span className="dot" /> server view — showing exactly what storage sees
+            </div>
+          )}
+        </section>
+
+        {activeUploads.length > 0 && (
+          <div className="status-strip">
+            {activeUploads.map((u) => (
+              <div key={u.id} className="upload-row">
+                <span className="row" style={{ gap: 8, overflow: "hidden", flex: 1 }}>
+                  <Loader2 size={14} className="spin accent" />
+                  <span className="name mono">{u.name}</span>
+                </span>
+                <span className="muted" style={{ fontSize: 12 }}>encrypting + uploading…</span>
+              </div>
             ))}
           </div>
         )}
-      </div>
 
-      {/* new folder */}
-      {showNewFolder && (
-        <div className="modal-backdrop" onClick={() => setShowNewFolder(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>New folder</h2>
+        <div
+          className={`drop-zone ${dragOver ? "dragover" : ""}`}
+          onDragEnter={onDragEnter}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+        >
+          {!items ? (
+            <div className="empty">
+              <Loader2 size={20} className="spin" />
+              <span>Loading…</span>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="empty">
+              <Inbox size={36} className="icon" />
+              <span>{isFiles ? "Empty folder. Drag files here or use the buttons above." : "Trash is empty."}</span>
+            </div>
+          ) : (
+            <div className="node-grid">
+              {items.map((n, i) => (
+                <NodeCard
+                  key={n.id}
+                  i={i}
+                  node={n}
+                  serverView={serverView}
+                  inTrash={!isFiles}
+                  onOpenFolder={() => openFolder(n)}
+                  onPreview={() => onOpenPreview(n)}
+                  onDownload={() => onDownload(n)}
+                  onTrash={() => onTrash(n)}
+                  onRestore={() => onRestore(n)}
+                  onPermanentlyDelete={() => onPermanentlyDelete(n)}
+                  onRename={() => startRename(n)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {showNewFolder && (
+          <Modal title="New folder" onClose={() => setShowNewFolder(false)}>
             <input
               type="text"
               placeholder="Folder name"
@@ -356,15 +383,11 @@ export default function VaultPage() {
               <button className="ghost" onClick={() => setShowNewFolder(false)}>Cancel</button>
               <button onClick={submitNewFolder} disabled={!newFolderName.trim()}>Create</button>
             </div>
-          </div>
-        </div>
-      )}
+          </Modal>
+        )}
 
-      {/* rename */}
-      {renameNodeId && (
-        <div className="modal-backdrop" onClick={() => setRenameNodeId(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Rename</h2>
+        {renameNodeId && (
+          <Modal title="Rename" onClose={() => setRenameNodeId(null)}>
             <input
               type="text"
               value={renameValue}
@@ -376,56 +399,108 @@ export default function VaultPage() {
               <button className="ghost" onClick={() => setRenameNodeId(null)}>Cancel</button>
               <button onClick={submitRename} disabled={!renameValue.trim()}>Rename</button>
             </div>
-          </div>
-        </div>
-      )}
+          </Modal>
+        )}
 
-      {/* preview */}
-      {previewNode && (
-        <div className="modal-backdrop" onClick={closePreview}>
-          <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
-            <header>
-              <span className="name">
-                {iconForName(previewNode.name, 16)}
-                <span className="mono">{previewNode.name}</span>
-              </span>
-              <div className="row">
-                <button className="ghost" onClick={() => onDownload(previewNode)}>
-                  <Download size={14} /> Download
-                </button>
-                <button className="icon" onClick={closePreview} aria-label="Close">
-                  <X size={16} />
-                </button>
-              </div>
-            </header>
-            <div className="body">
-              {!previewUrl ? (
-                <span className="muted row" style={{ gap: 8 }}>
-                  <Loader2 size={16} className="spin" /> Decrypting…
+        {showHowItWorks && <HowItWorksModal onClose={() => setShowHowItWorks(false)} />}
+
+        {previewNode && (
+          <div className="modal-backdrop" onClick={closePreview}>
+            <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+              <header>
+                <span className="name">
+                  {iconForName(previewNode.name, 16)}
+                  <span className="mono">{previewNode.name}</span>
                 </span>
-              ) : previewMime?.startsWith("image/") ? (
-                <img src={previewUrl} alt={previewNode.name} />
-              ) : previewMime === "application/pdf" ? (
-                <iframe src={previewUrl} title={previewNode.name} />
-              ) : previewMime?.startsWith("video/") ? (
-                <video src={previewUrl} controls />
-              ) : previewMime?.startsWith("audio/") ? (
-                <audio src={previewUrl} controls />
-              ) : (
-                <span className="muted">No preview for this file type. Download instead.</span>
-              )}
+                <div className="row">
+                  <button className="ghost" onClick={() => onDownload(previewNode)}>
+                    <Download size={14} /> Download
+                  </button>
+                  <button className="icon" onClick={closePreview} aria-label="Close">
+                    <X size={16} />
+                  </button>
+                </div>
+              </header>
+              <div className="body">
+                {!previewUrl ? (
+                  <span className="muted row" style={{ gap: 8 }}>
+                    <Loader2 size={16} className="spin" /> Decrypting…
+                  </span>
+                ) : previewMime?.startsWith("image/") ? (
+                  <img src={previewUrl} alt={previewNode.name} />
+                ) : previewMime === "application/pdf" ? (
+                  <iframe src={previewUrl} title={previewNode.name} />
+                ) : previewMime?.startsWith("video/") ? (
+                  <video src={previewUrl} controls />
+                ) : previewMime?.startsWith("audio/") ? (
+                  <audio src={previewUrl} controls />
+                ) : (
+                  <span className="muted">No preview for this file type. Download instead.</span>
+                )}
+              </div>
             </div>
           </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2>{title}</h2>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function HowItWorksModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+        <h2>How encryption works in ArgonVault</h2>
+        <ol className="how-list">
+          <li>
+            <strong>Password → keys (your browser).</strong> Argon2id with 64 MiB / 3 iters
+            turns your password into <span className="mono">wrap_key</span> + <span className="mono">auth_token</span>.
+            Server only sees the <span className="mono">auth_token</span> hash.
+          </li>
+          <li>
+            <strong>Vault key (your browser).</strong> A 32-byte random key, wrapped under
+            your <span className="mono">wrap_key</span>. Stored on the server only in wrapped form.
+          </li>
+          <li>
+            <strong>Per-file keys (your browser).</strong> Every upload gets its own AES-256-GCM
+            data key, wrapped under your <span className="mono">vault_key</span> and stored as
+            metadata.
+          </li>
+          <li>
+            <strong>Direct browser → S3.</strong> The encrypted bytes go straight from your browser
+            to S3 via a presigned URL. The API server never touches plaintext or ciphertext.
+          </li>
+          <li>
+            <strong>Filenames are encrypted too.</strong> The server sees opaque base64 — not folder
+            names, not file names. Toggle <em>Server view</em> in the sidebar to see exactly that.
+          </li>
+        </ol>
+        <div className="row" style={{ justifyContent: "flex-end" }}>
+          <button onClick={onClose}>Got it</button>
         </div>
-      )}
-    </main>
+      </div>
+    </div>
   );
 }
 
 function NodeCard({
-  node, inTrash, onOpenFolder, onPreview, onDownload, onTrash, onRestore, onPermanentlyDelete, onRename,
+  i, node, serverView, inTrash,
+  onOpenFolder, onPreview, onDownload, onTrash, onRestore, onPermanentlyDelete, onRename,
 }: {
+  i: number;
   node: DecryptedNode;
+  serverView: boolean;
   inTrash: boolean;
   onOpenFolder: () => void;
   onPreview: () => void;
@@ -439,20 +514,37 @@ function NodeCard({
   const previewable = !isFolder && isPreviewable(node.name);
 
   function onClick() {
-    if (inTrash) return;
+    if (inTrash || serverView) return;
     if (isFolder) onOpenFolder();
     else if (previewable) onPreview();
     else onDownload();
   }
   function clickAction(e: MouseEvent, fn: () => void) { e.stopPropagation(); fn(); }
 
+  if (serverView) {
+    const ctSnippet = node.name_ciphertext.slice(0, 28) + "…";
+    return (
+      <div className="node node-server" style={{ ["--i" as never]: i }}>
+        <div className="node-icon"><FileIcon size={20} /></div>
+        <div className="node-name mono">{node.id}</div>
+        <div className="node-meta mono">name_ct: {ctSnippet}</div>
+        <div className="node-meta mono">
+          {node.kind === "file" ? `size: ${node.size} B (ciphertext)` : "type: opaque"}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`node ${isFolder ? "folder" : ""}`} onClick={onClick} title={node.name}>
+    <div
+      className={`node ${isFolder ? "folder" : ""}`}
+      onClick={onClick}
+      title={node.name}
+      style={{ ["--i" as never]: i }}
+    >
       <div className="node-icon">{iconForName(node.name, 22, isFolder)}</div>
       <div className="node-name">{node.name}</div>
-      <div className="node-meta">
-        {isFolder ? "folder" : formatBytes(node.size)}
-      </div>
+      <div className="node-meta">{isFolder ? "folder" : formatBytes(node.size)}</div>
       <div className="node-actions">
         {inTrash ? (
           <>
