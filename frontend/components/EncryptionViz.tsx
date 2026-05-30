@@ -1,7 +1,7 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 function b64encode(bytes: Uint8Array): string {
   let bin = "";
@@ -17,20 +17,29 @@ function randomBytes(n: number): Uint8Array {
  *
  *   [INPUT] ─▶ [AES-256-GCM] ─▶ [BASE64] ─▶ [OUTPUT]
  *                   ▲
- *              [data key]
- *              [nonce 12B]
+ *              [data key, generated on mount — never re-rendered server-side]
+ *              [nonce 12B, fresh per encryption]
+ *
+ * Key generation is deferred to useEffect so the server and client agree on
+ * initial render (no hydration mismatch).
  */
 export function EncryptionViz() {
   const [plaintext, setPlaintext] = useState("argonvault is zero-knowledge");
+  const [keyBytes, setKeyBytes] = useState<Uint8Array | null>(null);
   const [ciphertext, setCiphertext] = useState("");
   const [nonce, setNonce] = useState("");
   const [revealKey, setRevealKey] = useState(false);
 
-  const keyBytes = useMemo(() => randomBytes(32), []);
-  const keyFull = useMemo(() => b64encode(keyBytes), [keyBytes]);
-  const keyFingerprint = useMemo(() => keyFull.slice(0, 16), [keyFull]);
+  // generate the demo key only on the client
+  useEffect(() => {
+    setKeyBytes(randomBytes(32));
+  }, []);
+
+  const keyFull = keyBytes ? b64encode(keyBytes) : "";
+  const keyFingerprint = keyFull.slice(0, 16);
 
   useEffect(() => {
+    if (!keyBytes) return;
     let cancelled = false;
     (async () => {
       try {
@@ -81,13 +90,16 @@ export function EncryptionViz() {
 
       <div className="viz-row" style={{ marginBottom: 0 }}>
         <label className="viz-label">→ output (sent to server)</label>
-        <div className="viz-output">{ciphertext}<span className="cursor" /></div>
+        <div className="viz-output" suppressHydrationWarning>
+          {ciphertext || "—"}
+          {ciphertext && <span className="cursor" />}
+        </div>
       </div>
 
       <div className="viz-meta">
         <div className="viz-meta-cell">
           <span className="viz-meta-key">nonce (12B)</span>
-          <span className="viz-meta-val">{nonce}</span>
+          <span className="viz-meta-val" suppressHydrationWarning>{nonce || "—"}</span>
         </div>
         <div className="viz-meta-cell">
           <span className="viz-meta-key">
@@ -102,8 +114,8 @@ export function EncryptionViz() {
               {revealKey ? <EyeOff size={11} /> : <Eye size={11} />}
             </button>
           </span>
-          <span className="viz-meta-val" title={revealKey ? "" : "click the eye to reveal"}>
-            {revealKey ? keyFull : `${keyFingerprint}…`}
+          <span className="viz-meta-val" suppressHydrationWarning title={revealKey ? "" : "click the eye to reveal"}>
+            {!keyBytes ? "—" : revealKey ? keyFull : `${keyFingerprint}…`}
           </span>
         </div>
       </div>
