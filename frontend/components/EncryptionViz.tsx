@@ -1,10 +1,8 @@
 "use client";
 
-import { Eye, EyeOff, Key, Lock, Zap } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-// Tiny embedded helpers (decoupled from /lib so this component can be dropped
-// on any marketing page without dragging the vault APIs in).
 function b64encode(bytes: Uint8Array): string {
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
@@ -15,33 +13,26 @@ function randomBytes(n: number): Uint8Array {
 }
 
 /**
- * A live demo of AES-256-GCM running in the browser.
+ * Live AES-256-GCM logic-flow demo.
  *
- *   - You type a string.
- *   - On every keystroke we encrypt it with a fresh nonce and show:
- *       · what you typed (plaintext)
- *       · the ciphertext blob the server would receive (base64)
- *       · key fingerprint (random per page load)
- *       · nonce (random per encryption)
- *
- *  The key is generated once per page mount and never leaves this component.
+ *   [INPUT] ─▶ [AES-256-GCM] ─▶ [BASE64] ─▶ [OUTPUT]
+ *                   ▲
+ *              [data key]
+ *              [nonce 12B]
  */
 export function EncryptionViz() {
-  const [plaintext, setPlaintext] = useState("ArgonVault is zero-knowledge.");
+  const [plaintext, setPlaintext] = useState("argonvault is zero-knowledge");
   const [ciphertext, setCiphertext] = useState("");
   const [nonce, setNonce] = useState("");
   const [revealKey, setRevealKey] = useState(false);
 
   const keyBytes = useMemo(() => randomBytes(32), []);
-  const keyFingerprint = useMemo(() => {
-    // Stable visual digest of the key — first 8 chars of base64.
-    return b64encode(keyBytes).slice(0, 16);
-  }, [keyBytes]);
   const keyFull = useMemo(() => b64encode(keyBytes), [keyBytes]);
+  const keyFingerprint = useMemo(() => keyFull.slice(0, 16), [keyFull]);
 
   useEffect(() => {
     let cancelled = false;
-    async function run() {
+    (async () => {
       try {
         const cryptoKey = await crypto.subtle.importKey(
           "raw", keyBytes, "AES-GCM", false, ["encrypt"],
@@ -61,68 +52,66 @@ export function EncryptionViz() {
       } catch (e) {
         setCiphertext("(error: " + (e instanceof Error ? e.message : "unknown") + ")");
       }
-    }
-    run();
+    })();
     return () => { cancelled = true; };
   }, [plaintext, keyBytes]);
 
   return (
-    <div className="enc-viz">
-      <div className="enc-viz-head">
-        <Zap size={14} className="accent" />
-        <span>Live demo · AES-256-GCM in your browser</span>
-      </div>
+    <div className="viz">
+      <span className="viz-title">LIVE — AES-256-GCM</span>
 
-      <div className="enc-viz-row">
-        <label className="enc-viz-label">Plaintext</label>
+      <div className="viz-row">
+        <label className="viz-label">$ input (plaintext)</label>
         <input
-          className="enc-viz-input"
+          className="viz-input"
           type="text"
           value={plaintext}
           maxLength={120}
           onChange={(e) => setPlaintext(e.target.value)}
-          placeholder="Type anything…"
+          placeholder="type anything…"
           spellCheck={false}
         />
       </div>
 
-      <div className="enc-viz-arrow">
-        <Lock size={14} className="accent" /> encrypt
-      </div>
-
-      <div className="enc-viz-row">
-        <label className="enc-viz-label">Ciphertext sent to server</label>
-        <div className="enc-viz-output mono">{ciphertext}</div>
-      </div>
-
-      <div className="enc-viz-meta">
-        <div className="enc-viz-meta-cell">
-          <span className="enc-viz-meta-key">nonce</span>
-          <span className="mono enc-viz-meta-val">{nonce}</span>
+      <div className="viz-pipe">
+        <div className="viz-pipe-line">
+          <span className="viz-op">aes-256-gcm</span>
         </div>
-        <div className="enc-viz-meta-cell">
-          <span className="enc-viz-meta-key">
-            <Key size={11} /> data key
+      </div>
+
+      <div className="viz-row" style={{ marginBottom: 0 }}>
+        <label className="viz-label">→ output (sent to server)</label>
+        <div className="viz-output">{ciphertext}<span className="cursor" /></div>
+      </div>
+
+      <div className="viz-meta">
+        <div className="viz-meta-cell">
+          <span className="viz-meta-key">nonce (12B)</span>
+          <span className="viz-meta-val">{nonce}</span>
+        </div>
+        <div className="viz-meta-cell">
+          <span className="viz-meta-key">
+            data key (32B)
             <button
               type="button"
-              className="enc-viz-reveal"
+              className="viz-reveal"
               onClick={() => setRevealKey((v) => !v)}
               aria-label="Toggle key reveal"
+              style={{ marginLeft: "auto" }}
             >
               {revealKey ? <EyeOff size={11} /> : <Eye size={11} />}
             </button>
           </span>
-          <span className="mono enc-viz-meta-val" title={revealKey ? "" : "click the eye to reveal"}>
-            {revealKey ? keyFull : keyFingerprint + "…"}
+          <span className="viz-meta-val" title={revealKey ? "" : "click the eye to reveal"}>
+            {revealKey ? keyFull : `${keyFingerprint}…`}
           </span>
         </div>
       </div>
 
-      <p className="enc-viz-foot muted">
-        This is the same primitive ArgonVault uses on every file.
-        In the real app, the data key itself is wrapped under a key derived
-        from your password — so even this ciphertext travels with its key
-        already protected.
+      <p className="viz-foot">
+        Same primitive ArgonVault uses on every file. In the real app, the data
+        key itself is wrapped under a key derived from your password — so even
+        this ciphertext travels with its key already protected.
       </p>
     </div>
   );
