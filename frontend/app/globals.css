@@ -5,11 +5,11 @@
 :root {
   color-scheme: light;
 
-  /* paper surfaces */
-  --paper:        #ebe6d3;
-  --paper-soft:   #f1ecda;
-  --paper-warm:   #e2dcc6;
-  --paper-deep:   #d6d0bb;
+  /* paper surfaces — cooler bone, less yellow */
+  --paper:        #ecead8;
+  --paper-soft:   #f3f1e0;
+  --paper-warm:   #e3e0cb;
+  --paper-deep:   #d4d2bf;
 
   /* ink */
   --ink:          #1c1c1c;
@@ -31,9 +31,8 @@
   --terminal-text:  #d4d4cc;
   --terminal-muted: #6f7a6f;
 
-  /* blueprint grid */
-  --grid:        rgba(60, 80, 95, 0.07);
-  --grid-strong: rgba(60, 80, 95, 0.14);
+  /* blueprint dots */
+  --dot:        rgba(60, 80, 95, 0.18);
 
   /* type */
   --font-mono: var(--font-mono), ui-monospace, "JetBrains Mono", "Cascadia Code", Consolas, monospace;
@@ -55,19 +54,17 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* paper texture + blueprint grid */
+/* subtle blueprint-dot background */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image:
-    linear-gradient(var(--grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
-    linear-gradient(var(--grid-strong) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-strong) 1px, transparent 1px);
-  background-size: 10px 10px, 10px 10px, 100px 100px, 100px 100px;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1.2px);
+  background-size: 22px 22px;
+  background-position: 0 0;
   z-index: 0;
+  opacity: 0.85;
 }
 
 body > * { position: relative; z-index: 1; }
@@ -268,25 +265,27 @@ input[type="checkbox"]:checked::after {
 
 .cursor {
   display: inline-block;
-  width: 8px;
-  height: 14px;
+  width: 2px;
+  height: 13px;
   background: var(--green-bright);
-  vertical-align: middle;
-  animation: blink 1s steps(2, end) infinite;
-  margin-left: 2px;
+  vertical-align: -2px;
+  animation: blink 1.2s ease-in-out infinite;
+  margin-left: 3px;
 }
 @keyframes blink {
-  50% { opacity: 0; }
+  0%, 45%   { opacity: 1; }
+  50%, 95%  { opacity: 0.15; }
+  100%      { opacity: 1; }
 }
 
 .cursor-ink {
   display: inline-block;
-  width: 8px;
-  height: 14px;
+  width: 2px;
+  height: 13px;
   background: var(--ink);
-  vertical-align: middle;
-  animation: blink 1s steps(2, end) infinite;
-  margin-left: 2px;
+  vertical-align: -2px;
+  animation: blink 1.2s ease-in-out infinite;
+  margin-left: 3px;
 }
 
 /* type-on effect for any element marked .type-line */
@@ -294,7 +293,7 @@ input[type="checkbox"]:checked::after {
   display: inline-block;
   overflow: hidden;
   white-space: pre;                /* preserve leading spaces in terminal output */
-  animation: typeline 1.4s steps(60, end) backwards;
+  animation: typeline 0.45s steps(40, end) backwards;
   animation-delay: var(--type-delay, 0ms);
   max-width: 100%;
 }

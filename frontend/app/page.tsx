@@ -100,7 +100,7 @@ export default function HomePage() {
         </div>
 
         <Terminal>
-          <TypeWriter lines={HERO_SESSION} pause={260} startDelay={300} />
+          <TypeWriter lines={HERO_SESSION} pause={90} startDelay={150} />
         </Terminal>
       </section>
 
