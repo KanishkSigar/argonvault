@@ -1,13 +1,13 @@
-/** A blueprint-style architecture diagram: 3 boxes + wires + return path. */
+/** Blueprint-style architecture diagram: 3 boxes + animated wires + return path. */
 export function Schematic() {
   return (
     <div className="schematic">
       <span className="schematic-title">FIG 01 — DATA FLOW</span>
       <div className="schematic-grid" style={{ gridTemplateColumns: "1fr 32px 1fr 32px 1fr" }}>
         <Box label="Browser" sub="aes-gcm · argon2id" />
-        <Wire />
+        <Wire delay={0} />
         <Box label="FastAPI" sub="key broker" />
-        <Wire />
+        <Wire delay={1100} />
         <Box label="S3 / MinIO" sub="ciphertext blobs" />
       </div>
       <div className="schematic-return">
@@ -26,6 +26,10 @@ function Box({ label, sub }: { label: string; sub: string }) {
   );
 }
 
-function Wire() {
-  return <div className="schematic-wire" aria-hidden />;
+function Wire({ delay = 0 }: { delay?: number }) {
+  return (
+    <div className="schematic-wire" aria-hidden>
+      <span className="schematic-signal" style={{ animationDelay: `${delay}ms` }} />
+    </div>
+  );
 }

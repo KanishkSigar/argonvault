@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Github } from "lucide-react";
 import { Bracket } from "@/components/Bracket";
 import { EncryptionViz } from "@/components/EncryptionViz";
+import { Reveal } from "@/components/Reveal";
 import { Schematic } from "@/components/Schematic";
 import { Terminal } from "@/components/Terminal";
 import { TypeWriter } from "@/components/TypeWriter";
@@ -105,99 +106,94 @@ export default function HomePage() {
       </section>
 
       {/* DATA FLOW (schematic) */}
-      <section id="flow" className="landing-section">
-        <div className="landing-section-head">
-          <div className="section-marker">02 — data flow</div>
-          <h2 className="landing-section-title">Three boxes, two wires.</h2>
-          <p className="landing-section-sub">
-            Crypto sits between your keyboard and the storage layer. The API in
-            the middle never sees plaintext or ciphertext — it brokers keys and
-            mints presigned URLs.
-          </p>
-        </div>
-        <Schematic />
-      </section>
+      <Reveal>
+        <section id="flow" className="landing-section">
+          <div className="landing-section-head">
+            <div className="section-marker">02 — data flow</div>
+            <h2 className="landing-section-title">Three boxes, two wires.</h2>
+            <p className="landing-section-sub">
+              Crypto sits between your keyboard and the storage layer. The API in
+              the middle never sees plaintext or ciphertext — it brokers keys and
+              mints presigned URLs.
+            </p>
+          </div>
+          <Schematic />
+        </section>
+      </Reveal>
 
       {/* LIVE DEMO */}
-      <section className="landing-section">
-        <div className="landing-section-head">
-          <div className="section-marker">03 — live</div>
-          <h2 className="landing-section-title">Encryption, right now.</h2>
-          <p className="landing-section-sub">
-            Type into the input. Watch AES-256-GCM ciphertext recompute on
-            every keystroke, in your browser, with a fresh nonce per encryption.
-          </p>
-        </div>
-        <EncryptionViz />
-      </section>
+      <Reveal>
+        <section className="landing-section">
+          <div className="landing-section-head">
+            <div className="section-marker">03 — live</div>
+            <h2 className="landing-section-title">Encryption, right now.</h2>
+            <p className="landing-section-sub">
+              Type into the input. Watch AES-256-GCM ciphertext recompute on
+              every keystroke, in your browser, with a fresh nonce per encryption.
+            </p>
+          </div>
+          <EncryptionViz />
+        </section>
+      </Reveal>
 
       {/* SPEC SHEET */}
-      <section id="spec" className="landing-section">
-        <div className="landing-section-head">
-          <div className="section-marker">04 — spec</div>
-          <h2 className="landing-section-title">What it actually does.</h2>
-          <p className="landing-section-sub">
-            Every claim has a parameter. Every parameter is in the README.
-          </p>
-        </div>
-        <div className="spec-rows">
-          <Spec num="S-01" title="Zero-knowledge metadata"
-            desc="Filenames and folder names are encrypted with your vault key. The server sees opaque base64 blobs at random UUIDs." />
-          <Spec num="S-02" title="Memory-hard KDF"
-            desc="Argon2id with 64 MiB cost makes brute-forcing a stolen password hash expensive even on GPUs." />
-          <Spec num="S-03" title="Envelope encryption"
-            desc="Per-file data key wrapped by the vault key, which is wrapped by the password-derived key. Same pattern as AWS KMS." />
-          <Spec num="S-04" title="Anti-enumeration login"
-            desc="Unknown emails receive a deterministic HMAC-derived dummy salt. Attackers can't probe for accounts." />
-          <Spec num="S-05" title="Direct browser → S3"
-            desc="Presigned URLs mean file bytes never traverse the API. Upload size is bounded by the browser, not the API host." />
-          <Spec num="S-06" title="Rate-limited auth"
-            desc="Per-IP sliding-window limits on login/prelogin/register. Threat model and self-pen-test in SECURITY.md." />
-        </div>
-      </section>
+      <Reveal>
+        <section id="spec" className="landing-section">
+          <div className="landing-section-head">
+            <div className="section-marker">04 — spec</div>
+            <h2 className="landing-section-title">What it actually does.</h2>
+            <p className="landing-section-sub">
+              Every claim has a parameter. Every parameter is in the README.
+            </p>
+          </div>
+          <div className="spec-rows">
+            <Spec num="S-01" title="Zero-knowledge metadata"
+              desc="Filenames and folder names are encrypted with your vault key. The server sees opaque base64 blobs at random UUIDs." />
+            <Spec num="S-02" title="Memory-hard KDF"
+              desc="Argon2id with 64 MiB cost makes brute-forcing a stolen password hash expensive even on GPUs." />
+            <Spec num="S-03" title="Envelope encryption"
+              desc="Per-file data key wrapped by the vault key, which is wrapped by the password-derived key. Same pattern as AWS KMS." />
+            <Spec num="S-04" title="Anti-enumeration login"
+              desc="Unknown emails receive a deterministic HMAC-derived dummy salt. Attackers can't probe for accounts." />
+            <Spec num="S-05" title="Direct browser → S3"
+              desc="Presigned URLs mean file bytes never traverse the API. Upload size is bounded by the browser, not the API host." />
+            <Spec num="S-06" title="Rate-limited auth"
+              desc="Per-IP sliding-window limits on login/prelogin/register. Threat model and self-pen-test in SECURITY.md." />
+          </div>
+        </section>
+      </Reveal>
 
       {/* CTA */}
-      <section className="landing-section">
-        <Bracket green>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: 18 }}>
-            <h2 className="landing-section-title" style={{ textAlign: "center" }}>
-              Ready to encrypt.<span className="cursor-ink" />
-            </h2>
-            <p className="landing-section-sub" style={{ textAlign: "center" }}>
-              Pick a password you&apos;ll remember. There is no reset — that&apos;s the point.
-            </p>
-            <button onClick={primary}>
-              {loggedIn ? "open vault" : "create vault"} <ArrowRight size={13} />
-            </button>
-          </div>
-        </Bracket>
-      </section>
+      <Reveal>
+        <section className="landing-section">
+          <Bracket green>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: 18 }}>
+              <h2 className="landing-section-title" style={{ textAlign: "center" }}>
+                Ready to encrypt.<span className="cursor-ink" />
+              </h2>
+              <p className="landing-section-sub" style={{ textAlign: "center" }}>
+                Pick a password you&apos;ll remember. There is no reset — that&apos;s the point.
+              </p>
+              <button onClick={primary}>
+                {loggedIn ? "open vault" : "create vault"} <ArrowRight size={13} />
+              </button>
+            </div>
+          </Bracket>
+        </section>
+      </Reveal>
 
-      {/* TITLE BLOCK FOOTER */}
-      <div className="title-block">
-        <div className="title-block-cell">
-          <div className="k">PROJECT</div>
-          <div className="v">ARGONVAULT</div>
-        </div>
-        <div className="title-block-cell">
-          <div className="k">DRAWING</div>
-          <div className="v">A-01</div>
-        </div>
-        <div className="title-block-cell">
-          <div className="k">REV</div>
-          <div className="v">04</div>
-        </div>
-        <div className="title-block-cell">
-          <div className="k">LICENSE</div>
-          <div className="v">MIT</div>
-        </div>
-        <div className="title-block-cell">
-          <div className="k">SOURCE</div>
-          <div className="v">
-            <a href="https://github.com/KanishkSigar/argonvault" target="_blank" rel="noopener noreferrer">github↗</a>
-          </div>
-        </div>
-      </div>
+      <footer className="landing-foot">
+        <span className="landing-foot-brand">
+          <span className="accent-bar" /> ARGONVAULT
+        </span>
+        <span className="landing-foot-links">
+          <a href="https://github.com/KanishkSigar/argonvault" target="_blank" rel="noopener noreferrer">github↗</a>
+          <span className="muted">·</span>
+          <a href="https://github.com/KanishkSigar/argonvault/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">security.md</a>
+          <span className="muted">·</span>
+          <span className="muted">MIT</span>
+        </span>
+      </footer>
     </div>
   );
 }
