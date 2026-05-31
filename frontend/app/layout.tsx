@@ -17,7 +17,7 @@ const sans = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ArgonVault — Zero-knowledge encrypted file vault",
+  title: "ArgonVault",
   description:
     "Argon2id + AES-256-GCM, end-to-end in your browser. The server holds your ciphertext and cannot read your files, your filenames, or your password.",
 };

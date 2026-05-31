@@ -2,11 +2,11 @@
 
 import { ReactNode, useEffect, useRef, useState } from "react";
 
-type Props = { children: ReactNode; delay?: number; threshold?: number; as?: keyof JSX.IntrinsicElements };
+type Props = { children: ReactNode; delay?: number; threshold?: number };
 
 /** Fades + lifts its children when they scroll into view. One-shot. */
-export function Reveal({ children, delay = 0, threshold = 0.12, as: Tag = "div" }: Props) {
-  const ref = useRef<HTMLElement>(null);
+export function Reveal({ children, delay = 0, threshold = 0.12 }: Props) {
+  const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
@@ -21,9 +21,8 @@ export function Reveal({ children, delay = 0, threshold = 0.12, as: Tag = "div" 
   }, [threshold]);
 
   return (
-    // @ts-expect-error generic tag
-    <Tag ref={ref} className={`reveal ${shown ? "shown" : ""}`} style={{ transitionDelay: `${delay}ms` }}>
+    <div ref={ref} className={`reveal ${shown ? "shown" : ""}`} style={{ transitionDelay: `${delay}ms` }}>
       {children}
-    </Tag>
+    </div>
   );
 }

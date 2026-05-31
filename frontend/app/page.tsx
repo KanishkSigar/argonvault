@@ -25,11 +25,16 @@ const HERO_SESSION = [
   <><span className="term-comment">  // 0 bytes of plaintext left this browser</span></>,
 ];
 
+// In a static-export deploy (no backend), NEXT_PUBLIC_API_URL is empty;
+// CTAs become "view source" links instead of trying to hit a dead backend.
+const DEMO_MODE = !process.env.NEXT_PUBLIC_API_URL;
+
 export default function HomePage() {
   const router = useRouter();
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
+    if (DEMO_MODE) { setLoggedIn(false); return; }
     let cancelled = false;
     auth.me()
       .then(() => { if (!cancelled) setLoggedIn(getVaultSession() !== null); })
@@ -38,8 +43,20 @@ export default function HomePage() {
   }, []);
 
   function primary() {
+    if (DEMO_MODE) {
+      window.open("https://github.com/KanishkSigar/argonvault", "_blank", "noopener");
+      return;
+    }
     if (loggedIn) router.push("/vault");
     else router.push("/signup");
+  }
+
+  function secondary() {
+    if (DEMO_MODE) {
+      window.open("https://github.com/KanishkSigar/argonvault#quick-start-zero-aws-zero-cards-zero-docker", "_blank", "noopener");
+      return;
+    }
+    router.push("/login");
   }
 
   return (
@@ -58,7 +75,13 @@ export default function HomePage() {
             target="_blank" rel="noopener noreferrer"
             className="landing-nav-link"
           ><Github size={12} /> source</a>
-          {loggedIn ? (
+          {DEMO_MODE ? (
+            <a
+              href="https://github.com/KanishkSigar/argonvault"
+              target="_blank" rel="noopener noreferrer"
+              className="landing-nav-cta"
+            >clone + run <ArrowRight size={12} /></a>
+          ) : loggedIn ? (
             <Link href="/vault" className="landing-nav-cta">open vault <ArrowRight size={12} /></Link>
           ) : (
             <>
@@ -87,12 +110,20 @@ export default function HomePage() {
           </p>
           <div className="hero-cta">
             <button onClick={primary}>
-              {loggedIn ? "open vault" : "create vault"} <ArrowRight size={13} />
+              {DEMO_MODE ? "view source" : loggedIn ? "open vault" : "create vault"} <ArrowRight size={13} />
             </button>
-            <button className="ghost" onClick={() => window.location.assign("#flow")}>
-              read the spec
+            <button className="ghost" onClick={secondary}>
+              {DEMO_MODE ? "run it locally" : loggedIn ? "switch account" : "sign in"}
             </button>
           </div>
+          {DEMO_MODE && (
+            <p className="muted" style={{ fontSize: 11, marginTop: 12, maxWidth: 540 }}>
+              <strong style={{ color: "var(--amber)" }}>demo mode —</strong> this
+              static deploy is the landing page only. clone the repo + run a
+              local backend + MinIO to use the full vault. instructions in the
+              README.
+            </p>
+          )}
           <div className="hero-meta">
             <span>KDF: <b>Argon2id-64M/3/1</b></span>
             <span>AEAD: <b>AES-256-GCM</b></span>
@@ -174,9 +205,14 @@ export default function HomePage() {
               <p className="landing-section-sub" style={{ textAlign: "center" }}>
                 Pick a password you&apos;ll remember. There is no reset — that&apos;s the point.
               </p>
-              <button onClick={primary}>
-                {loggedIn ? "open vault" : "create vault"} <ArrowRight size={13} />
-              </button>
+              <div className="hero-cta">
+                <button onClick={primary}>
+                  {DEMO_MODE ? "view source" : loggedIn ? "open vault" : "create vault"} <ArrowRight size={13} />
+                </button>
+                <button className="ghost" onClick={secondary}>
+                  {DEMO_MODE ? "run it locally" : loggedIn ? "switch account" : "sign in"}
+                </button>
+              </div>
             </div>
           </Bracket>
         </section>
