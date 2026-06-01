@@ -92,7 +92,6 @@ export function EncryptionViz() {
         <label className="viz-label">→ output (sent to server)</label>
         <div className="viz-output" suppressHydrationWarning>
           {ciphertext || "—"}
-          {ciphertext && <span className="cursor" />}
         </div>
       </div>
 
