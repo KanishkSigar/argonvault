@@ -14,15 +14,15 @@ import { auth } from "@/lib/api";
 import { getVaultSession } from "@/lib/vaultSession";
 
 const HERO_SESSION = [
-  <><span className="term-prompt">$</span> argonvault auth derive</>,
-  <><span className="term-comment">  → reading password from stdin (●●●●●●●●)</span></>,
-  <><span className="term-arrow">  →</span> argon2id(<span className="term-out">m=64MiB, t=3, p=1</span>) <span className="term-ok">✓</span></>,
-  <><span className="term-arrow">  →</span> derived: <span className="term-out">wrap_key</span> + <span className="term-out">auth_token</span></>,
+  <><span className="term-prompt">$</span> login</>,
+  <><span className="term-arrow">  →</span> turning your password into a key (in this browser)</>,
+  <><span className="term-arrow">  →</span> server got an opaque token, never the password <span className="term-ok">✓</span></>,
   <></>,
-  <><span className="term-prompt">$</span> argonvault encrypt ./design.pdf</>,
-  <><span className="term-arrow">  →</span> aes-256-gcm(<span className="term-out">data_key, nonce=12B</span>) <span className="term-ok">✓</span></>,
-  <><span className="term-arrow">  →</span> PUT https://storage/<span className="term-out">9f4c3a…</span> <span className="term-ok">✓ 200 OK</span></>,
-  <><span className="term-comment">  // 0 bytes of plaintext left this browser</span></>,
+  <><span className="term-prompt">$</span> upload report.pdf</>,
+  <><span className="term-arrow">  →</span> encrypting locally with AES-256-GCM <span className="term-ok">✓</span></>,
+  <><span className="term-arrow">  →</span> uploading ciphertext direct to S3 <span className="term-ok">✓</span></>,
+  <></>,
+  <><span className="term-comment">  // server stored the encrypted blob. it cannot read it.</span></>,
 ];
 
 // In a static-export deploy (no backend), NEXT_PUBLIC_API_URL is empty;
@@ -132,7 +132,7 @@ export default function HomePage() {
         </div>
 
         <Terminal>
-          <TypeWriter lines={HERO_SESSION} pause={90} startDelay={150} />
+          <TypeWriter lines={HERO_SESSION} pause={90} startDelay={150} cursor={false} />
         </Terminal>
       </section>
 
@@ -200,7 +200,7 @@ export default function HomePage() {
           <Bracket green>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: 18 }}>
               <h2 className="landing-section-title" style={{ textAlign: "center" }}>
-                Ready to encrypt.<span className="cursor-ink" />
+                Ready to encrypt.
               </h2>
               <p className="landing-section-sub" style={{ textAlign: "center" }}>
                 Pick a password you&apos;ll remember. There is no reset — that&apos;s the point.
