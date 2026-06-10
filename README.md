@@ -17,6 +17,8 @@ The server holds your ciphertext. The server cannot read your files, your filena
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/></a>
 </p>
 
+<img src="docs/screenshot.png" alt="ArgonVault — files you store, keys you keep, server that's blind" width="900"/>
+
 </div>
 
 ---
