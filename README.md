@@ -7,6 +7,16 @@ The server holds your ciphertext. The server cannot read your files, your filena
 
 <sub>Argon2id · AES-256-GCM · WebCrypto · FastAPI · Next.js 15 · S3-compatible</sub>
 
+<p>
+  <img src="https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white" alt="Next.js 15"/>
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19"/>
+  <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI"/>
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python 3.11+"/>
+  <img src="https://img.shields.io/badge/AWS%20S3-569A31?logo=amazons3&logoColor=white" alt="AWS S3"/>
+  <img src="https://img.shields.io/badge/crypto-Argon2id%20%C2%B7%20AES--256--GCM-4B0082" alt="Argon2id + AES-256-GCM"/>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/></a>
+</p>
+
 </div>
 
 ---
@@ -284,4 +294,4 @@ See [`SECURITY.md`](SECURITY.md) for the full set of known weaknesses, severitie
 
 ## License
 
-MIT — do what you want, no warranty.
+Released under the [MIT License](LICENSE) — do what you want, no warranty.
