@@ -297,3 +297,7 @@ See [`SECURITY.md`](SECURITY.md) for the full set of known weaknesses, severitie
 ## License
 
 Released under the [MIT License](LICENSE) — do what you want, no warranty.
+
+## Acknowledgments
+
+Developed with the assistance of AI-powered coding tools (Claude Code) for parts of the implementation and documentation.
