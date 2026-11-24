@@ -111,14 +111,22 @@ export async function renameNode(id: string, newName: string): Promise<NodeOut> 
 
 // ----- file upload (one file) ------------------------------------------------
 
+export const MAX_UPLOAD_MIB = 25;
+
 export async function uploadFile(parentId: string | null, file: File): Promise<NodeOut> {
   const sess = getVaultSession();
   if (!sess) throw new Error("not unlocked");
+
+  if (file.size > MAX_UPLOAD_MIB * 1024 * 1024) {
+    throw new Error(`Choose a file no larger than ${MAX_UPLOAD_MIB} MiB.`);
+  }
 
   const dataKey = randomBytes(32);
   const fileNonce = randomNonce();
   const wrappedDataKey = await aesEncryptB64(sess.vaultKey, dataKey);
   const encName = await encryptName(sess.vaultKey, file.name);
+
+  const ciphertext = await encryptFile(file, dataKey, fileNonce);
 
   const init = await nodes.initUpload({
     parent_id: parentId,
@@ -127,8 +135,6 @@ export async function uploadFile(parentId: string | null, file: File): Promise<N
     wrapped_data_key: wrappedDataKey,
     file_nonce: b64encode(fileNonce),
   });
-
-  const ciphertext = await encryptFile(file, dataKey, fileNonce);
 
   const put = await fetch(init.upload_url, {
     method: "PUT",

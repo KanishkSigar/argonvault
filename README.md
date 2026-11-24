@@ -54,6 +54,18 @@ architecture. Same category as Proton Drive, Cryptomator, MEGA.
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+## Demo and upload limits
+
+The GitHub Pages deployment is a static demonstration. To upload and retrieve files, run
+the connected frontend with the FastAPI API and private S3-compatible storage.
+The connected browser currently accepts up to **25 MiB per file** because encryption
+uses whole-file buffers. The API verifies that ciphertext exists in storage and matches
+the reported size before a file appears in the vault.
+
+For a deployment smoke test, hash a disposable file, upload it, refresh the vault,
+download the file, and compare hashes. Repeat with the network disconnected during upload
+and check that the incomplete file stays out of the list.
+
 ## Why it's interesting
 
 - **Real zero-knowledge.** Most "encrypted upload" projects on GitHub keep the

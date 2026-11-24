@@ -175,7 +175,7 @@ export default function VaultPage() {
   async function handleFiles(files: FileList | File[]) {
     const arr = Array.from(files);
     if (!arr.length) return;
-    await Promise.all(arr.map(runUpload));
+    for (const file of arr) await runUpload(file);
     refresh();
     setTimeout(() => setUploads((u) => u.filter((j) => j.status === "uploading")), 1500);
   }

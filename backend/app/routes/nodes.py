@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..auth import require_user
@@ -77,6 +77,7 @@ def list_children(
                 Node.user_id == user.id,
                 Node.parent_id == parent_id,
                 Node.trashed_at.is_(None),
+                or_(Node.kind == "folder", Node.size.is_not(None)),
             )
             .order_by(Node.kind.desc(), Node.created_at.desc())  # folders first, newest first
         )
@@ -162,11 +163,21 @@ def complete_upload(
     body: CompleteUploadRequest,
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
+    s: Settings = Depends(get_settings),
 ):
     n = _get_node(db, user, body.file_id)
     if n.kind != "file":
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "not a file")
-    n.size = body.size
+    try:
+        stored = get_s3().head_object(Bucket=s.storage_bucket, Key=n.id)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code")
+        if code in {"404", "NoSuchKey", "NotFound"}:
+            raise HTTPException(status.HTTP_409_CONFLICT, "ciphertext has not reached storage") from exc
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "could not verify stored ciphertext") from exc
+    if stored["ContentLength"] != body.size:
+        raise HTTPException(status.HTTP_409_CONFLICT, "stored ciphertext size mismatch")
+    n.size = stored["ContentLength"]
     db.commit()
     return {"ok": True}
 
